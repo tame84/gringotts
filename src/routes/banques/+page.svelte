@@ -29,7 +29,10 @@
 </script>
 
 <header>
-	<h1>Mes banques</h1>
+	<div>
+		<h1>Mes banques</h1>
+		<a href={resolve('/comptes')}>Mes comptes</a>
+	</div>
 	<button commandfor="addBankDialog" command="show-modal">Ajouter une banque</button>
 </header>
 

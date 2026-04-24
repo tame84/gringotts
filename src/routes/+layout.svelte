@@ -9,3 +9,7 @@
 </svelte:head>
 
 {@render children()}
+
+<footer>
+	<p>© Gringotts - Réalisé par Dino Valentini</p>
+</footer>

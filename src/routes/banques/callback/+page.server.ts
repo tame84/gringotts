@@ -1,4 +1,6 @@
+import { resolve } from '$app/paths';
 import { authorizeSession } from '$lib/remotes/session.remote';
+import { redirect } from '@sveltejs/kit';
 
 export const load = async ({ url }) => {
 	const state = url.searchParams.get('state');
@@ -11,5 +13,6 @@ export const load = async ({ url }) => {
 	}
 
 	const session = await authorizeSession({ state, code });
-	return { session };
+
+	redirect(302, resolve('/banque/[slug]?new=true', { slug: session.slug }));
 };

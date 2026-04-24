@@ -1,4 +1,4 @@
-interface EBASPSP {
+export interface EBASPSP {
 	name: string;
 	country: string;
 }

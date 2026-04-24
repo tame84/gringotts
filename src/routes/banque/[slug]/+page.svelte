@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { getSessionAccounts } from '$lib/remotes/session.remote';
-	import { getAccountUsageDisplayName, getCountryDisplayName } from '$lib/utils.js';
+	import Account from '$lib/components/account.svelte';
+	import { getAccountBalances, getAccountDetails } from '$lib/remotes/account.remote.js';
+	import { getSessionAccountIds } from '$lib/remotes/session.remote.js';
+	import { getCountryDisplayName } from '$lib/utils.js';
+	import dayjs from 'dayjs';
 
 	let { data } = $props();
 </script>
@@ -13,23 +16,35 @@
 	</nav>
 </header>
 
-<ul>
-	{#each await getSessionAccounts(data.sessionId) as account (account.iban)}
-		{console.log(account)}
+{#if data.isNew}
+	Votre banque a été liée jusqu’au {dayjs(data.session.validUntil)
+		.toDate()
+		.toLocaleDateString('fr', {
+			minute: 'numeric',
+			hour: 'numeric',
+			day: 'numeric',
+			month: 'long',
+			year: 'numeric'
+		})} avec succès ! {data.session.linkedAccountsCount} nouveaux comptes ont été ajoutés.
+{/if}
 
-		<li>
-			<a href={resolve('/banques')}>
-				<div>
-					{#if account.usage}
-						<span>{getAccountUsageDisplayName(account.usage)}</span>
-					{/if}
-					<h3>{account.holder.name}</h3>
-					{#if account.iban}
-						<span>{account.iban}</span>
-					{/if}
-				</div>
-				<p>{account.balance.amount} {account.balance.curreny}</p>
-			</a>
-		</li>
-	{/each}
-</ul>
+<svelte:boundary>
+	{#snippet pending()}
+		<p>Chargement des comptes...</p>
+	{/snippet}
+
+	<!-- eslint-disable-next-line @typescript-eslint/no-unused-vars -->
+	{#snippet failed(error, reset)}
+		<p>Une erreur est survenue.</p>
+		<button onclick={reset}>Réessayer</button>
+	{/snippet}
+
+	<ul>
+		{#each await getSessionAccountIds(data.session.id) as accountId (accountId)}
+			<Account
+				details={await getAccountDetails(accountId)}
+				balances={await getAccountBalances(accountId)}
+			/>
+		{/each}
+	</ul>
+</svelte:boundary>

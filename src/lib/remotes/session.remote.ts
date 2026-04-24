@@ -1,13 +1,10 @@
 import { getRequestEvent, query } from '$app/server';
 import { ENABLE_BANKING_REDIRECT_PATH } from '$env/static/private';
 import { db } from '$lib/server/db';
-import { sessionsStatesTable, sessionsTable } from '$lib/server/db/schema';
+import { accountsTable, sessionsStatesTable, sessionsTable } from '$lib/server/db/schema';
 import { createEBJWT } from '$lib/server/utils';
 import type {
-	EBAccountResource,
 	EBAuthorizeSessionResponse,
-	EBGetSessionResponse,
-	EBHalBalances,
 	EBStartAuthorizationRequest,
 	EBStartAuthorizationResponse
 } from '$lib/types/enablebanking';
@@ -97,6 +94,14 @@ export const authorizeSession = query(
 
 		const sessionData: EBAuthorizeSessionResponse = await response.json();
 
+		const validAccountIds = sessionData.accounts
+			.map((account) => {
+				if (account.uid) {
+					return account.uid;
+				}
+			})
+			.filter((id) => id !== undefined);
+
 		const [insertedSession] = await db
 			.insert(sessionsTable)
 			.values({
@@ -105,7 +110,7 @@ export const authorizeSession = query(
 				maxConsentValidty: existingState[0].maxConsentValidity,
 				psuType: sessionData.psu_type,
 				aspsp: { name: sessionData.aspsp.name, country: sessionData.aspsp.country },
-				linkedAccountsCount: sessionData.accounts.length,
+				linkedAccountsCount: validAccountIds.length,
 				validUntil: dayjs(sessionData.access.valid_until).toDate()
 			})
 			.onConflictDoUpdate({
@@ -113,107 +118,26 @@ export const authorizeSession = query(
 				set: {
 					id: sessionData.session_id,
 					maxConsentValidty: existingState[0].maxConsentValidity,
-					linkedAccountsCount: sessionData.accounts.length,
+					linkedAccountsCount: validAccountIds.length,
 					validUntil: dayjs(sessionData.access.valid_until).toDate()
 				}
 			})
-			.returning({ slug: sessionsTable.slug, aspsp: sessionsTable.aspsp });
+			.returning({ id: sessionsTable.id, slug: sessionsTable.slug, aspsp: sessionsTable.aspsp });
+
+		const accountsToInsert: (typeof accountsTable.$inferSelect)[] = validAccountIds.map(
+			(accountId) => ({ id: accountId, sessionId: insertedSession.id })
+		);
+
+		await db.insert(accountsTable).values(accountsToInsert).onConflictDoNothing();
 
 		return { slug: insertedSession.slug, aspsp: insertedSession.aspsp };
 	}
 );
 
-const getSessionData = query(v.string(), async (id) => {
-	const { fetch } = getRequestEvent();
-
-	const response = await fetch(`https://api.enablebanking.com/sessions/${id}`, {
-		method: 'GET',
-		headers: {
-			Authorization: `Bearer ${createEBJWT()}`
-		}
-	}).catch((err) => {
-		console.error('Error fetching session data from Enable Banking API:', err);
-		error(500, 'Failed to retrieve session data');
-	});
-	if (!response.ok) {
-		console.error(
-			`Error fetching session data from Enable Banking API (Code: ${response.status}): ${await response.text()}`
-		);
-		error(500, 'Failed to retrieve session data');
-	}
-
-	const sessionData: EBGetSessionResponse = await response.json();
-
-	return sessionData;
-});
-
-export const getSessionAccounts = query(v.string(), async (sessionId) => {
-	const sessionData = await getSessionData(sessionId);
-	const accountsIds = sessionData.accounts;
-
-	const accounts = await Promise.all(
-		accountsIds.map(async (accountId) => {
-			const accountDetailsResponse = await fetch(
-				`https://api.enablebanking.com/accounts/${accountId}/details`,
-				{
-					method: 'GET',
-					headers: {
-						Authorization: `Bearer ${createEBJWT()}`
-					}
-				}
-			).catch((err) => {
-				console.error('Error fetching account details from Enable Banking API:', err);
-				error(500, 'Failed to retrieve accounts details');
-			});
-			if (!accountDetailsResponse.ok) {
-				console.error(
-					`Error fetching account details from Enable Banking API (Code: ${accountDetailsResponse.status}): ${await accountDetailsResponse.text()}`
-				);
-				error(500, 'Failed to retrieve accounts details');
-			}
-
-			const accountData: EBAccountResource = await accountDetailsResponse.json();
-
-			const accountBalancesResponse = await fetch(
-				`https://api.enablebanking.com/accounts/${accountId}/balances`,
-				{
-					method: 'GET',
-					headers: {
-						Authorization: `Bearer ${createEBJWT()}`
-					}
-				}
-			).catch((err) => {
-				console.error('Error fetching account balances from Enable Banking API:', err);
-				error(500, 'Failed to retrieve accounts balances');
-			});
-			if (!accountBalancesResponse.ok) {
-				console.error(
-					`Error fetching account balances from Enable Banking API (Code: ${accountBalancesResponse.status}): ${await accountBalancesResponse.text()}`
-				);
-				error(500, 'Failed to retrieve accounts balances');
-			}
-
-			const accountBalancesData: EBHalBalances = await accountBalancesResponse.json();
-
-			const balance =
-				accountBalancesData.balances.find((balance) => balance.balance_type === 'ITBD') ||
-				accountBalancesData.balances.find((balance) => balance.balance_type === 'ITAV') ||
-				accountBalancesData.balances[0];
-
-			return {
-				iban: accountData.account_id?.iban || null,
-				holder: {
-					name: accountData.name
-				},
-				usage: accountData.usage || null,
-				balance: {
-					curreny: balance.balance_amount.currency,
-					amount: balance.balance_amount.amount,
-					type: balance.balance_type
-				}
-			};
-		})
-	);
-
-	return accounts;
+export const getSessionAccountIds = query(v.string(), async (sessionId) => {
+	const accountIds = await db
+		.select({ id: accountsTable.id })
+		.from(accountsTable)
+		.where(eq(accountsTable.sessionId, sessionId));
+	return accountIds.map((a) => a.id);
 });
