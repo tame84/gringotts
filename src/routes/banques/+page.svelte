@@ -31,7 +31,7 @@
 <header>
 	<div>
 		<h1>Mes banques</h1>
-		<a href={resolve('/comptes')}>Mes comptes</a>
+		<a href={resolve('/')}>Mes comptes</a>
 	</div>
 	<button commandfor="addBankDialog" command="show-modal">Ajouter une banque</button>
 </header>

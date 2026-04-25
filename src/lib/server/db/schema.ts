@@ -23,5 +23,5 @@ export const accountsTable = pgTable('accounts', {
 	id: text('id').unique().notNull(),
 	sessionId: text('session_id')
 		.notNull()
-		.references(() => sessionsTable.id)
+		.references(() => sessionsTable.id, { onDelete: 'cascade', onUpdate: 'cascade' })
 });

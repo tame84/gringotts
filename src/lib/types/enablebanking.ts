@@ -619,7 +619,7 @@ interface EBTransaction {
 	transaction_id?: string;
 }
 
-type EBTransactionStatus = 'BOOK' | 'CNCL' | 'HOLD' | 'OTHR' | 'PDNG' | 'RJCT' | 'SCHD';
+export type EBTransactionStatus = 'BOOK' | 'CNCL' | 'HOLD' | 'OTHR' | 'PDNG' | 'RJCT' | 'SCHD';
 
 type EBTransactionsFetchStrategy = 'default' | 'longest';
 

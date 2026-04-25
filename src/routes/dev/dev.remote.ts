@@ -1,8 +1,35 @@
 import { getRequestEvent, query } from '$app/server';
 import { createEBJWT } from '$lib/server/utils';
-import type { EBAccountResource, EBHalBalances, EBHalTransactions } from '$lib/types/enablebanking';
+import type {
+	EBAccountResource,
+	EBGetApplicationResponse,
+	EBHalBalances,
+	EBHalTransactions
+} from '$lib/types/enablebanking';
 import { error } from '@sveltejs/kit';
 import * as v from 'valibot';
+
+export const getApplication = query(async () => {
+	const { fetch } = getRequestEvent();
+
+	const response = await fetch('https://api.enablebanking.com/application', {
+		headers: {
+			Authorization: `Bearer ${createEBJWT()}`
+		}
+	}).catch((err) => {
+		console.error('Error fetching application data from Enable Banking API:', err);
+		error(500, 'Failed to retrieve application data');
+	});
+	if (!response.ok) {
+		console.error(
+			`Error fetching application data from Enable Banking API (Code: ${response.status}): ${await response.text()}`
+		);
+		error(500, 'Failed to retrieve application data');
+	}
+
+	const applicationData: EBGetApplicationResponse = await response.json();
+	return applicationData;
+});
 
 export const getAccount = query.batch(v.string(), async (accountIds) => {
 	const accounts = await Promise.all(
@@ -27,12 +54,7 @@ export const getAccount = query.batch(v.string(), async (accountIds) => {
 
 			return {
 				id: accountId,
-				iban: accountData.account_id?.iban || null,
-				usage: accountData.usage || null,
-				type: accountData.cash_account_type,
-				holder: {
-					name: accountData.name || null
-				}
+				...accountData
 			};
 		})
 	);
@@ -61,17 +83,9 @@ export const getAccountBalances = query.batch(v.string(), async (accountIds) => 
 			}
 
 			const balancesData: EBHalBalances = await response.json();
-
-			const balance =
-				balancesData.balances.find((balance) => balance.balance_type === 'ITBD') ||
-				balancesData.balances.find((balance) => balance.balance_type === 'ITAV') ||
-				balancesData.balances[0];
-
 			return {
 				accountId,
-				type: balance.balance_type,
-				currency: balance.balance_amount.currency,
-				amount: balance.balance_amount.amount
+				...balancesData
 			};
 		})
 	);
@@ -83,31 +97,38 @@ export const getAccountBalances = query.batch(v.string(), async (accountIds) => 
 export const getAccountTransactions = query(
 	v.object({
 		accountId: v.string(),
-		transactionStatus: v.pipe(v.optional(v.picklist(['BOOK', 'SCHD']), 'BOOK'))
+		transactionStatus: v.pipe(v.optional(v.picklist(['BOOK', 'SCHD', 'N/A']), 'BOOK'))
 	}),
 	async ({ accountId, transactionStatus }) => {
 		const { fetch } = getRequestEvent();
 
-		// Note: Enable Banking Sandbox API doesn't support filtering transactions by status, filtering will be done in production
-		// Return empty transactions array if transactionStatus is provided for development
-		if (transactionStatus === 'SCHD') {
-			return {
-				continuationKey: null,
-				transactions: []
-			};
-		}
-		const response = await fetch(
-			`https://api.enablebanking.com/accounts/${accountId}/transactions`,
-			{
+		let response;
+
+		if (transactionStatus === 'N/A') {
+			response = await fetch(`https://api.enablebanking.com/accounts/${accountId}/transactions`, {
 				method: 'GET',
 				headers: {
 					Authorization: `Bearer ${createEBJWT()}`
 				}
-			}
-		).catch((err) => {
-			console.error('Error fetching account transactions from Enable Banking API:', err);
-			error(500, 'Failed to retrieve accounts transactions');
-		});
+			}).catch((err) => {
+				console.error('Error fetching account transactions from Enable Banking API:', err);
+				error(500, 'Failed to retrieve accounts transactions');
+			});
+		} else {
+			response = await fetch(
+				`https://api.enablebanking.com/accounts/${accountId}/transactions?transaction_status=${transactionStatus}`,
+				{
+					method: 'GET',
+					headers: {
+						Authorization: `Bearer ${createEBJWT()}`
+					}
+				}
+			).catch((err) => {
+				console.error('Error fetching account transactions from Enable Banking API:', err);
+				error(500, 'Failed to retrieve accounts transactions');
+			});
+		}
+
 		if (!response.ok) {
 			console.error(
 				`Error fetching account transactions from Enable Banking API (Code: ${response.status}): ${await response.text()}`
@@ -116,32 +137,6 @@ export const getAccountTransactions = query(
 		}
 
 		const transactionsData: EBHalTransactions = await response.json();
-
-		return {
-			continuationKey: transactionsData.continuation_key || null,
-			transactions: transactionsData.transactions.map((tx) => ({
-				entryReference: tx.entry_reference || crypto.randomUUID(),
-				amount: tx.transaction_amount.amount,
-				currency: tx.transaction_amount.currency,
-				creditDebitIndicator: tx.credit_debit_indicator,
-				creditor: {
-					name: tx.creditor?.name || null,
-					iban: tx.creditor_account?.iban || null
-				},
-				debtor: {
-					name: tx.debtor?.name || null,
-					iban: tx.debtor_account?.iban || null
-				},
-				valueDate: tx.value_date || null,
-				transactionDate: tx.transaction_date || null,
-				referenceNumber: tx.reference_number || null,
-				status: tx.status,
-				additionalInformations: {
-					referenceNumber: tx.reference_number || null,
-					bankTransactionCode: tx.bank_transaction_code?.code || null,
-					remittanceInformation: tx.remittance_information || null
-				}
-			}))
-		};
+		return transactionsData;
 	}
 );

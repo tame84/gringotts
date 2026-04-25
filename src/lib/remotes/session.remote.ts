@@ -32,7 +32,7 @@ export const getAuthorizationUrl = query(
 				country: aspspCountry
 			},
 			state,
-			redirect_url: `${url.origin}${ENABLE_BANKING_REDIRECT_PATH}`,
+			redirect_url: `https://${url.hostname}${ENABLE_BANKING_REDIRECT_PATH}`,
 			language: 'fr'
 		};
 

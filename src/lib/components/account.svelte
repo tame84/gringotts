@@ -1,37 +1,39 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import type { getAccountBalances, getAccountDetails } from '$lib/remotes/account.remote';
+	import type { getAccountBalances, getAccount } from '$lib/remotes/account.remote';
 	import type { EBASPSP } from '$lib/types/enablebanking';
 	import { getAccountUsageDisplayName, getCountryDisplayName } from '$lib/utils';
 
 	interface Props {
-		details: Awaited<ReturnType<typeof getAccountDetails>>;
+		account: Awaited<ReturnType<typeof getAccount>>;
 		balances: Awaited<ReturnType<typeof getAccountBalances>>;
 		aspsp?: {
 			name: EBASPSP['name'];
 			country: EBASPSP['country'];
-		} | null;
+		};
 	}
 
-	let { details, balances, aspsp }: Props = $props();
+	let { account, balances, aspsp }: Props = $props();
 </script>
 
-<li>
-	<a href={resolve('/banques')}>
-		<div>
-			{#if details?.usage}
-				<span>{getAccountUsageDisplayName(details?.usage)}</span>
-			{/if}
-			<h3>{details?.holder.name}</h3>
-			<p>
-				{[
-					aspsp ? `${aspsp.name} - ${getCountryDisplayName('fr', aspsp.country)}` : null,
-					details?.iban
-				]
-					.filter(Boolean)
-					.join(' • ')}
-			</p>
-		</div>
-		<p>{balances?.amount} {balances?.currency}</p>
-	</a>
-</li>
+{#if account}
+	<li>
+		<a href={resolve('/compte/[id]', { id: account.id })}>
+			<div>
+				{#if account?.usage}
+					<span>{getAccountUsageDisplayName(account?.usage)}</span>
+				{/if}
+				<h3>{account?.holder.name}</h3>
+				<p>
+					{[
+						aspsp ? `${aspsp.name} - ${getCountryDisplayName('fr', aspsp.country)}` : null,
+						account?.iban
+					]
+						.filter(Boolean)
+						.join(' • ')}
+				</p>
+			</div>
+			<p>{balances?.amount} {balances?.currency}</p>
+		</a>
+	</li>
+{/if}

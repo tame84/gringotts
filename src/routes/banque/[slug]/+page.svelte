@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import Account from '$lib/components/account.svelte';
-	import { getAccountBalances, getAccountDetails } from '$lib/remotes/account.remote.js';
+	import { getAccountBalances, getAccount } from '$lib/remotes/account.remote.js';
 	import { getSessionAccountIds } from '$lib/remotes/session.remote.js';
 	import { getCountryDisplayName } from '$lib/utils.js';
 	import dayjs from 'dayjs';
@@ -17,15 +17,26 @@
 </header>
 
 {#if data.isNew}
-	Votre banque a été liée jusqu’au {dayjs(data.session.validUntil)
-		.toDate()
-		.toLocaleDateString('fr', {
-			minute: 'numeric',
-			hour: 'numeric',
-			day: 'numeric',
-			month: 'long',
-			year: 'numeric'
-		})} avec succès ! {data.session.linkedAccountsCount} nouveaux comptes ont été ajoutés.
+	<p>
+		Votre banque a été liée jusqu’au {dayjs(data.session.validUntil)
+			.toDate()
+			.toLocaleDateString('fr', {
+				minute: 'numeric',
+				hour: 'numeric',
+				day: 'numeric',
+				month: 'long',
+				year: 'numeric'
+			})} avec succès !
+		<span>
+			{#if data.session.linkedAccountsCount === 1}
+				{data.session.linkedAccountsCount} nouveau compte a été ajouté.
+			{:else if data.session.linkedAccountsCount > 1}
+				{data.session.linkedAccountsCount} nouveaux comptes ont été ajoutés.
+			{:else}
+				Aucun nouveau compte n’a été ajouté.
+			{/if}
+		</span>
+	</p>
 {/if}
 
 <svelte:boundary>
@@ -42,7 +53,7 @@
 	<ul>
 		{#each await getSessionAccountIds(data.session.id) as accountId (accountId)}
 			<Account
-				details={await getAccountDetails(accountId)}
+				account={await getAccount(accountId)}
 				balances={await getAccountBalances(accountId)}
 			/>
 		{/each}

@@ -7,6 +7,6 @@ export const getAccounts = query(async () => {
 	const accounts = await db
 		.select({ id: accountsTable.id, aspsp: sessionsTable.aspsp })
 		.from(accountsTable)
-		.leftJoin(sessionsTable, eq(accountsTable.sessionId, sessionsTable.id));
+		.innerJoin(sessionsTable, eq(accountsTable.sessionId, sessionsTable.id));
 	return accounts;
 });
