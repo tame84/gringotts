@@ -13,7 +13,7 @@
 
 {#if transactions.length > 0}
 	{#each transactions as transaction, i (i)}
-		<tr onclick={() => (selectedTransaction = transaction.entryReference)}>
+		<tr onclick={() => (selectedTransaction = transaction.id)}>
 			{#if transaction.creditDebitIndicator === 'DBIT'}
 				<td
 					><p>{transaction.creditor.name || 'Inconnu'}</p>
@@ -29,7 +29,7 @@
 			{/if}
 			<td>{transaction.transactionDate || '-'}</td>
 			<td>{transaction.valueDate || '-'}</td>
-			{#if selectedTransaction === transaction.entryReference}
+			{#if selectedTransaction === transaction.id}
 				<td colspan="4">
 					{#if transaction.additionalInformations.referenceNumber}
 						<div>

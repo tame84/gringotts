@@ -29,10 +29,21 @@
 		<p>{account?.iban}</p>
 	</div>
 	<div>
-		<p>
-			{balances?.amount}
-			{balances?.currency}
-		</p>
+		{#if balances?.bookedBalance}
+			<p>{balances.bookedBalance.amount} <span>{balances.bookedBalance.currency}</span></p>
+
+			{#if balances.availableBalance}
+				<p>
+					{balances.availableBalance.amount} <span>{balances.availableBalance.currency}</span> disponibles
+				</p>
+			{/if}
+		{:else if balances?.availableBalance}
+			<p>
+				{balances.availableBalance.amount} <span>{balances.availableBalance.currency}</span>
+			</p>
+		{:else}
+			<p>Solde non disponible</p>
+		{/if}
 	</div>
 </div>
 

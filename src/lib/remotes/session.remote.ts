@@ -1,5 +1,5 @@
 import { getRequestEvent, query } from '$app/server';
-import { ENABLE_BANKING_REDIRECT_PATH } from '$env/static/private';
+import { ENABLE_BANKING_REDIRECT_PATH, NODE_ENV } from '$env/static/private';
 import { db } from '$lib/server/db';
 import { accountsTable, sessionsStatesTable, sessionsTable } from '$lib/server/db/schema';
 import { createEBJWT } from '$lib/server/utils';
@@ -25,14 +25,14 @@ export const getAuthorizationUrl = query(
 
 		const body: EBStartAuthorizationRequest = {
 			access: {
-				valid_until: dayjs().add(maximumConsentValidity, 'second').toISOString()
+				valid_until: dayjs().second(0).add(maximumConsentValidity, 'second').toISOString()
 			},
 			aspsp: {
 				name: aspspName,
 				country: aspspCountry
 			},
 			state,
-			redirect_url: `https://${url.hostname}${ENABLE_BANKING_REDIRECT_PATH}`,
+			redirect_url: `http${NODE_ENV === 'production' ? 's' : ''}://${url.host}${ENABLE_BANKING_REDIRECT_PATH}`,
 			language: 'fr'
 		};
 
