@@ -62,16 +62,40 @@ export const getAccountBalances = query.batch(v.string(), async (accountIds) => 
 
 			const balancesData: EBHalBalances = await response.json();
 
-			const balance =
-				balancesData.balances.find((balance) => balance.balance_type === 'ITBD') ||
-				balancesData.balances.find((balance) => balance.balance_type === 'ITAV') ||
-				balancesData.balances[0];
+			const availableBalance = balancesData.balances.find(
+				(b) =>
+					b.balance_type === 'ITAV' ||
+					b.balance_type === 'XPCD' ||
+					b.balance_type === 'CLAV' ||
+					b.balance_type === 'FWAV' ||
+					b.balance_type === 'OPAV'
+			);
+			const bookedBalance = balancesData.balances.find(
+				(b) =>
+					b.balance_type === 'ITBD' ||
+					b.balance_type === 'CLBD' ||
+					b.balance_type === 'OPBD' ||
+					b.balance_type === 'PRCD'
+			);
 
 			return {
 				accountId,
-				type: balance.balance_type,
-				currency: balance.balance_amount.currency,
-				amount: balance.balance_amount.amount
+				availableBalance: availableBalance
+					? {
+							type: availableBalance.balance_type,
+							name: availableBalance.name,
+							currency: availableBalance.balance_amount.currency,
+							amount: availableBalance.balance_amount.amount
+						}
+					: null,
+				bookedBalance: bookedBalance
+					? {
+							type: bookedBalance.balance_type,
+							name: bookedBalance.name,
+							currency: bookedBalance.balance_amount.currency,
+							amount: bookedBalance.balance_amount.amount
+						}
+					: null
 			};
 		})
 	);
@@ -88,16 +112,8 @@ export const getAccountTransactions = query(
 	async ({ accountId, transactionStatus }) => {
 		const { fetch } = getRequestEvent();
 
-		// Note: Enable Banking Sandbox API doesn't support filtering transactions by status, filtering will be done in production
-		// Return empty transactions array if transactionStatus is provided for development
-		if (transactionStatus === 'SCHD') {
-			return {
-				continuationKey: null,
-				transactions: []
-			};
-		}
 		const response = await fetch(
-			`https://api.enablebanking.com/accounts/${accountId}/transactions`,
+			`https://api.enablebanking.com/accounts/${accountId}/transactions?transaction_status=${transactionStatus}`,
 			{
 				method: 'GET',
 				headers: {
@@ -120,7 +136,7 @@ export const getAccountTransactions = query(
 		return {
 			continuationKey: transactionsData.continuation_key || null,
 			transactions: transactionsData.transactions.map((tx) => ({
-				entryReference: tx.entry_reference || crypto.randomUUID(),
+				id: tx.transaction_id || crypto.randomUUID(),
 				amount: tx.transaction_amount.amount,
 				currency: tx.transaction_amount.currency,
 				creditDebitIndicator: tx.credit_debit_indicator,
